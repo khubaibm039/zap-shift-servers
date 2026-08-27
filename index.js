@@ -338,8 +338,26 @@ async function run() {
                 }
             }
             const result = await riderCollection.updateOne(query,updatedDoc)
+
+            if(status === "approved"){
+                const email = req.body.email
+                const userQuery = {email}
+                const updateUser = {
+                    $set:{
+                        role: 'rider'
+                    }
+                }
+                const userResult = await userCollection.updateOne(userQuery, updateUser)
+            }
+
             res.send(result)
         });
+        app.delete('/riders/:id', async (req, res) => {
+            const id = req.params.id
+            const query = {_id : new ObjectId(id)}
+            const result = await riderCollection.deleteOne(query)
+            res.send(result)
+        })
 
         //? ---------------------------------------------------------------
         //? Send a ping to confirm a successful connection
