@@ -309,7 +309,7 @@ async function run() {
         //? ---------------------------------------------------------------
         // k  ride related apis
         //? ---------------------------------------------------------------
-        app.get('riders', async(req, res)=>{
+        app.get('/riders', async(req, res)=>{
             const query = {}
             if (req.query.status){
                 query.status = req.query.status
@@ -327,6 +327,19 @@ async function run() {
             const result = await riderCollection.insertOne(rider)
             res.send(result)
         })
+
+        app.patch('/riders/:id',verifyFBToken , async (req, res) => {
+            const status = req.body.status 
+            const id = req.params.id
+            const query = {_id: new ObjectId(id)}
+            const updatedDoc = {
+                $set:{
+                    status: status,
+                }
+            }
+            const result = await riderCollection.updateOne(query,updatedDoc)
+            res.send(result)
+        });
 
         //? ---------------------------------------------------------------
         //? Send a ping to confirm a successful connection
