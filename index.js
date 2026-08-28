@@ -84,11 +84,18 @@ async function run() {
         //? ---------------------------------------------------------------
         //k user related apis
         //? ---------------------------------------------------------------
-        app.get('/users', verifyFBToken, async (req, res) => {
-            const cursor = userCollection.find()
-            const result = await cursor.toArray()
-            res.send(result)            
-        })
+        app.get("/users", verifyFBToken, async (req, res) => {
+            const cursor = userCollection.find();
+            const result = await cursor.toArray();
+            res.send(result);
+        });
+        app.get("/users/:email/role", async (req, res) => {
+            const email = req.params.email;
+            const query = { email };
+            const user = await userCollection.findOne(query);
+            res.send({ role: user?.role || "user" });
+        });
+
         app.post("/users", async (req, res) => {
             const user = req.body;
             user.role = "user";
@@ -101,18 +108,18 @@ async function run() {
             const result = await userCollection.insertOne(user);
             res.send(result);
         });
-        app.patch('/users/:id', async (req, res) => {
-            const id = req.params.id 
-            const roleInfo = req.body
-            const query = {_id: new ObjectId(id)}
+        app.patch("/users/:id", async (req, res) => {
+            const id = req.params.id;
+            const roleInfo = req.body;
+            const query = { _id: new ObjectId(id) };
             const updateRole = {
-                $set:{
-                    role: roleInfo.role
-                }
-            }
-            const result = await userCollection.updateOne(query, updateRole)
-            res.send(result)
-        })
+                $set: {
+                    role: roleInfo.role,
+                },
+            };
+            const result = await userCollection.updateOne(query, updateRole);
+            res.send(result);
+        });
 
         //? ---------------------------------------------------------------
         //k parcel api
@@ -327,55 +334,58 @@ async function run() {
         //? ---------------------------------------------------------------
         // k  ride related apis
         //? ---------------------------------------------------------------
-        app.get('/riders', async(req, res)=>{
-            const query = {}
-            if (req.query.status){
-                query.status = req.query.status
+        app.get("/riders", async (req, res) => {
+            const query = {};
+            if (req.query.status) {
+                query.status = req.query.status;
             }
-            const cursor = riderCollection.find(query)
-            const result = await cursor.toArray(cursor)
-            res.send(result)
-        })
-
-        app.post("/riders", async(req, res)=>{
-            const rider = req.body;
-            rider.status = "pending"
-            rider.createAt = new Date()
-
-            const result = await riderCollection.insertOne(rider)
-            res.send(result)
-        })
-
-        app.patch('/riders/:id',verifyFBToken , async (req, res) => {
-            const status = req.body.status 
-            const id = req.params.id
-            const query = {_id: new ObjectId(id)}
-            const updatedDoc = {
-                $set:{
-                    status: status,
-                }
-            }
-            const result = await riderCollection.updateOne(query,updatedDoc)
-
-            if(status === "approved"){
-                const email = req.body.email
-                const userQuery = {email}
-                const updateUser = {
-                    $set:{
-                        role: 'rider'
-                    }
-                }
-                const userResult = await userCollection.updateOne(userQuery, updateUser)
-            }
-
-            res.send(result)
+            const cursor = riderCollection.find(query);
+            const result = await cursor.toArray(cursor);
+            res.send(result);
         });
-        app.delete('/riders/:id', async (req, res) => {
-            const id = req.params.id
-            const query = {_id : new ObjectId(id)}
-            const result = await riderCollection.deleteOne(query)
-            res.send(result)
-        })
+
+        app.post("/riders", async (req, res) => {
+            const rider = req.body;
+            rider.status = "pending";
+            rider.createAt = new Date();
+
+            const result = await riderCollection.insertOne(rider);
+            res.send(result);
+        });
+
+        app.patch("/riders/:id", verifyFBToken, async (req, res) => {
+            const status = req.body.status;
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    status: status,
+                },
+            };
+            const result = await riderCollection.updateOne(query, updatedDoc);
+
+            if (status === "approved") {
+                const email = req.body.email;
+                const userQuery = { email };
+                const updateUser = {
+                    $set: {
+                        role: "rider",
+                    },
+                };
+                const userResult = await userCollection.updateOne(
+                    userQuery,
+                    updateUser,
+                );
+            }
+
+            res.send(result);
+        });
+        app.delete("/riders/:id", async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await riderCollection.deleteOne(query);
+            res.send(result);
+        });
 
         //? ---------------------------------------------------------------
         //? Send a ping to confirm a successful connection
