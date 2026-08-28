@@ -80,6 +80,19 @@ async function run() {
         const parcelsCollection = database.collection("parcels");
         const paymentCollection = database.collection("payments");
         const riderCollection = database.collection("riders");
+        //? ---------------------------------------------------------------
+        //k middleware with database access
+        //k must be used after verifyFBToken middleware
+        //? ---------------------------------------------------------------
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded_email;
+            const query = {email}
+            const user = await userCollection.findOne(query)
+            if (!user || user.role !== 'admin') {
+                return res.status(403).send({message: "forbidden access"})
+            }
+            next()
+        }
 
         //? ---------------------------------------------------------------
         //k user related apis
@@ -95,7 +108,6 @@ async function run() {
             const user = await userCollection.findOne(query);
             res.send({ role: user?.role || "user" });
         });
-
         app.post("/users", async (req, res) => {
             const user = req.body;
             user.role = "user";
@@ -108,7 +120,7 @@ async function run() {
             const result = await userCollection.insertOne(user);
             res.send(result);
         });
-        app.patch("/users/:id", async (req, res) => {
+        app.patch("/users/:id/role", verifyFBToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const roleInfo = req.body;
             const query = { _id: new ObjectId(id) };
@@ -145,9 +157,7 @@ async function run() {
                 res.status(500).send({ message: "Failed to fetch parcels" });
             }
         });
-        //? ---------------------------------------------------------------
-        //k get parcel by id
-        //? ---------------------------------------------------------------
+
         app.get("/parcels/:id", async (req, res) => {
             try {
                 const id = req.params.id;
@@ -159,7 +169,6 @@ async function run() {
                 res.status(500).send({ message: "Failed to fetch parcel" });
             }
         });
-        //? ---------------------------------------------------------------
         app.post("/parcels", async (req, res) => {
             try {
                 const parcel = req.body;
@@ -174,9 +183,6 @@ async function run() {
                 res.status(500).send({ message: "Failed to create parcel" });
             }
         });
-        //? ---------------------------------------------------------------
-        //k Delete parcel data by id
-        //? ---------------------------------------------------------------
         app.delete("/parcels/:id", async (req, res) => {
             try {
                 const id = req.params.id;
@@ -188,9 +194,11 @@ async function run() {
                 res.status(500).send({ message: "Failed to delete parcel" });
             }
         });
+
         //? ---------------------------------------------------------------
         //k payment related apis new
         //? ---------------------------------------------------------------
+
         app.post("/create-checkout-session", async (req, res) => {
             try {
                 const paymentInfo = req.body;
@@ -306,7 +314,6 @@ async function run() {
                 });
             }
         });
-
         app.get("/payments", verifyFBToken, async (req, res) => {
             try {
                 const { email } = req.query;
@@ -332,7 +339,7 @@ async function run() {
             }
         });
         //? ---------------------------------------------------------------
-        // k  ride related apis
+        //k  ride related apis
         //? ---------------------------------------------------------------
         app.get("/riders", async (req, res) => {
             const query = {};
@@ -343,7 +350,6 @@ async function run() {
             const result = await cursor.toArray(cursor);
             res.send(result);
         });
-
         app.post("/riders", async (req, res) => {
             const rider = req.body;
             rider.status = "pending";
