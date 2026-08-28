@@ -98,7 +98,17 @@ async function run() {
         //k user related apis
         //? ---------------------------------------------------------------
         app.get("/users", verifyFBToken, async (req, res) => {
-            const cursor = userCollection.find();
+            const searchText = req.query.searchText;
+            const query = {};
+            if(searchText){
+                // query.displayName ={$regex: searchText, $options: 'i'}
+                query.$or= [
+                    {displayName : {$regex: searchText, $options: "i"}},
+                    {email : {$regex: searchText, $options: "i"}}
+                ]
+            }
+
+            const cursor = userCollection.find(query).sort({createAt: -1}).limit(3)
             const result = await cursor.toArray();
             res.send(result);
         });
