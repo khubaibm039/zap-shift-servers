@@ -84,6 +84,11 @@ async function run() {
         //? ---------------------------------------------------------------
         //k user related apis
         //? ---------------------------------------------------------------
+        app.get('/users', verifyFBToken, async (req, res) => {
+            const cursor = userCollection.find()
+            const result = await cursor.toArray()
+            res.send(result)            
+        })
         app.post("/users", async (req, res) => {
             const user = req.body;
             user.role = "user";
@@ -96,6 +101,19 @@ async function run() {
             const result = await userCollection.insertOne(user);
             res.send(result);
         });
+        app.patch('/users/:id', async (req, res) => {
+            const id = req.params.id 
+            const roleInfo = req.body
+            const query = {_id: new ObjectId(id)}
+            const updateRole = {
+                $set:{
+                    role: roleInfo.role
+                }
+            }
+            const result = await userCollection.updateOne(query, updateRole)
+            res.send(result)
+        })
+
         //? ---------------------------------------------------------------
         //k parcel api
         //? ---------------------------------------------------------------
