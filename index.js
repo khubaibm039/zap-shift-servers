@@ -108,7 +108,7 @@ async function run() {
                 ]
             }
 
-            const cursor = userCollection.find(query).sort({createAt: -1}).limit(3)
+            const cursor = userCollection.find(query).sort({createAt: -1}).limit(5)
             const result = await cursor.toArray();
             res.send(result);
         });
@@ -149,7 +149,10 @@ async function run() {
         app.get("/parcels", async (req, res) => {
             try {
                 const query = {};
-                const { email } = req.query;
+                const { email,deliveryStatus } = req.query;
+                if(deliveryStatus){
+                    query.deliveryStatus  = deliveryStatus;
+                }
                 //? ---------------------------------------------------------------
                 //? parcels?email=''&
                 if (email) {
@@ -290,6 +293,7 @@ async function run() {
                     {
                         $set: {
                             paymentStatus: "paid",
+                            deliveryStatus: 'pending-pickup',
                             trackingId,
                         },
                     },
@@ -352,9 +356,16 @@ async function run() {
         //k  ride related apis
         //? ---------------------------------------------------------------
         app.get("/riders", async (req, res) => {
+            const {status, district, workStatus} = req.query
             const query = {};
-            if (req.query.status) {
-                query.status = req.query.status;
+            if (status) {
+                query.status = status;
+            }
+            if(district){
+                query.district = district
+            }
+            if(workStatus){
+                query.workStatus = workStatus;
             }
             const cursor = riderCollection.find(query);
             const result = await cursor.toArray(cursor);
@@ -376,6 +387,7 @@ async function run() {
             const updatedDoc = {
                 $set: {
                     status: status,
+                    workStatus: "available"
                 },
             };
             const result = await riderCollection.updateOne(query, updatedDoc);
