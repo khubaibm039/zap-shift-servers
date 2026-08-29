@@ -181,6 +181,20 @@ async function run() {
                 res.status(500).send({ message: "Failed to fetch parcels" });
             }
         });
+        app.get('/parcels/rider', async (req, res)   => {
+            const {riderEmail, deliveryStatus} =   req.query
+            const query = {}
+            if(riderEmail){
+                query.riderEmail = riderEmail
+            }
+            if(deliveryStatus){
+                query.deliveryStatus = deliveryStatus
+            }
+            const cursor = parcelsCollection.find(query)
+            const result = await cursor.toArray()
+            res.send(result)
+
+        })
 
         app.get("/parcels/:id", async (req, res) => {
             try {
