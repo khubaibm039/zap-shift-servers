@@ -80,6 +80,7 @@ async function run() {
         const parcelsCollection = database.collection("parcels");
         const paymentCollection = database.collection("payments");
         const riderCollection = database.collection("riders");
+        const trackingsCollection = database.collection("trackings");
         //? ---------------------------------------------------------------
         //k middleware with database access
         //k must be used after verifyFBToken middleware
@@ -93,7 +94,17 @@ async function run() {
             }
             next();
         };
-
+        //k tracking related function
+        const logTracking = async (trackingId, status) => {
+            const log = {
+                trackingId,
+                status,
+                details: status.split("-").join(" "),
+                createAt: new Date(),
+            };
+            const result = await trackingsCollection.insertOne(log);
+            return result;
+        };
         //? ---------------------------------------------------------------
         //k user related apis
         //? ---------------------------------------------------------------
@@ -153,7 +164,6 @@ async function run() {
                 res.send(result);
             },
         );
-
         //? ---------------------------------------------------------------
         //k parcel api
         //? ---------------------------------------------------------------
@@ -181,20 +191,22 @@ async function run() {
                 res.status(500).send({ message: "Failed to fetch parcels" });
             }
         });
-        app.get('/parcels/rider', async (req, res)   => {
-            const {riderEmail, deliveryStatus} =   req.query
-            const query = {}
-            if(riderEmail){
-                query.riderEmail = riderEmail
+        app.get("/parcels/rider", async (req, res) => {
+            const { riderEmail, deliveryStatus } = req.query;
+            const query = {};
+            if (riderEmail) {
+                query.riderEmail = riderEmail;
             }
-            if(deliveryStatus){
-                query.deliveryStatus = deliveryStatus
+            if (deliveryStatus !== "parcel_delivered") {
+                // query.deliveryStatus = {$in: ["driver_assigned", "rider_arriving" ]};
+                query.deliveryStatus = { $nin: ["parcel_delivered"] };
+            } else {
+                query.deliveryStatus = deliveryStatus;
             }
-            const cursor = parcelsCollection.find(query)
-            const result = await cursor.toArray()
-            res.send(result)
-
-        })
+            const cursor = parcelsCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(result);
+        });
 
         app.get("/parcels/:id", async (req, res) => {
             try {
@@ -233,7 +245,7 @@ async function run() {
             }
         });
         app.patch("/parcels/:id", async (req, res) => {
-            const { riderId, riderName, riderEmail } = req.body;
+            const { riderId, riderName, riderEmail, trackingId } = req.body;
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
 
@@ -260,8 +272,35 @@ async function run() {
                 riderQuery,
                 riderUpdateDoc,
             );
+            //K log tracking
+            logTracking(trackingId, "driver_assigned");
 
             res.send(riderResult, parcelsResult);
+        });
+        app.patch("/parcels/:id/status", async (req, res) => {
+            const { deliveryStatus, riderId, trackingId } = req.body;
+            const query = { _id: new ObjectId(req.params.id) };
+            const updateDoc = {
+                $set: {
+                    deliveryStatus: deliveryStatus,
+                },
+            };
+            if (deliveryStatus === "parcel_delivered") {
+                const riderQuery = { _id: new ObjectId(riderId) };
+                const riderUpdateDoc = {
+                    $set: {
+                        workStatus: "available",
+                    },
+                };
+                const riderResult = await riderCollection.updateOne(
+                    riderQuery,
+                    riderUpdateDoc,
+                );
+            }
+            const result = await parcelsCollection.updateOne(query, updateDoc);
+            //k log tracking 
+            logTracking(trackingId, deliveryStatus)
+            res.send(result);
         });
 
         //? ---------------------------------------------------------------
@@ -366,16 +405,19 @@ async function run() {
                     paidAt: new Date(),
                     trackingId: trackingId,
                 };
-                const resultPayment =
-                    await paymentCollection.insertOne(payment);
+                if (session.payment_status === "paid") {
+                    const resultPayment =
+                        await paymentCollection.insertOne(payment);
+                    logTracking(trackingId, "pending-pickup");
 
-                return res.send({
-                    success: true,
-                    modifyParcel: result,
-                    trackingId,
-                    transactionId,
-                    paymentInfo: resultPayment,
-                });
+                    return res.send({
+                        success: true,
+                        modifyParcel: result,
+                        trackingId,
+                        transactionId,
+                        paymentInfo: resultPayment,
+                    });
+                }
             } catch (err) {
                 console.error("payment-success error:", err);
                 return res.status(500).send({
