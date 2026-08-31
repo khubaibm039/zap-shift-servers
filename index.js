@@ -99,7 +99,7 @@ async function run() {
             const log = {
                 trackingId,
                 status,
-                details: status.split("-").join(" "),
+                details: status.split("_").join(" "),
                 createAt: new Date(),
             };
             const result = await trackingsCollection.insertOne(log);
@@ -222,10 +222,11 @@ async function run() {
         app.post("/parcels", async (req, res) => {
             try {
                 const parcel = req.body;
-
+                const trackingId = generateTrackingId();
                 // ? parcel created time
                 parcel.createAt = new Date();
-
+                parcel.trackingId = trackingId;
+                logTracking(trackingId, "parcel_created");
                 const result = await parcelsCollection.insertOne(parcel);
                 res.send(result);
             } catch (err) {
@@ -298,8 +299,8 @@ async function run() {
                 );
             }
             const result = await parcelsCollection.updateOne(query, updateDoc);
-            //k log tracking 
-            logTracking(trackingId, deliveryStatus)
+            //k log tracking
+            logTracking(trackingId, deliveryStatus);
             res.send(result);
         });
 
@@ -330,6 +331,7 @@ async function run() {
                     metadata: {
                         parcelId: paymentInfo.parcelId,
                         parcelName: paymentInfo.parcelName,
+                        trackingId: paymentInfo.trackingId,
                     },
                     success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
                     cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
@@ -380,7 +382,8 @@ async function run() {
                     });
                 }
 
-                const trackingId = generateTrackingId();
+                const trackingId = session.metadata.trackingId;
+                
                 const parcelId = session.metadata.parcelId;
 
                 const result = await parcelsCollection.updateOne(
@@ -388,8 +391,7 @@ async function run() {
                     {
                         $set: {
                             paymentStatus: "paid",
-                            deliveryStatus: "pending-pickup",
-                            trackingId,
+                            deliveryStatus: "parcel_paid",
                         },
                     },
                 );
@@ -510,6 +512,15 @@ async function run() {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await riderCollection.deleteOne(query);
+            res.send(result);
+        });
+        //? ---------------------------------------------------------------
+        //k tracking related Apis
+        //? ---------------------------------------------------------------
+        app.get("/trackings/:trackingId/logs", async (req, res) => {
+            const trackingId = req.params.trackingId;
+            const query = { trackingId };
+            const result = await trackingsCollection.find(query).toArray();
             res.send(result);
         });
 
