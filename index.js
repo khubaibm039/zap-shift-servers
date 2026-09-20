@@ -94,6 +94,16 @@ async function run() {
             }
             next();
         };
+        //k verify rider
+        const verifyRider = async (req, res, next) => {
+            const email = req.decoded_email;
+            const query = { email };
+            const user = await userCollection.findOne(query);
+            if (!user || user.role !== "rider") {
+                return res.status(403).send({ message: "forbidden access" });
+            }
+            next();
+        };
         //k tracking related function
         const logTracking = async (trackingId, status) => {
             const log = {
@@ -347,7 +357,7 @@ async function run() {
         //? ---------------------------------------------------------------
         //k session id check and update
         //? ---------------------------------------------------------------
-        app.patch("/payment-success", async (req, res) => {
+         app.patch("/payment-success", async (req, res) => {
             try {
                 const sessionId = req.query.session_id;
 
@@ -369,57 +379,53 @@ async function run() {
                 }
 
                 const transactionId = session.payment_intent;
-
-                const paymentExist = await paymentCollection.findOne({
-                    transactionId,
-                });
-                if (paymentExist) {
-                    return res.send({
-                        success: true,
-                        message: "Payment already recorded",
-                        transactionId,
-                        trackingId: paymentExist.trackingId,
-                    });
-                }
-
                 const trackingId = session.metadata.trackingId;
-                
                 const parcelId = session.metadata.parcelId;
-
-                const result = await parcelsCollection.updateOne(
-                    { _id: new ObjectId(parcelId) },
-                    {
-                        $set: {
-                            paymentStatus: "paid",
-                            deliveryStatus: "parcel_paid",
-                        },
-                    },
-                );
 
                 const payment = {
                     amount: session.amount_total / 100,
                     currency: session.currency,
                     customerEmail: session.customer_email,
-                    parcelId: session.metadata.parcelId,
+                    parcelId,
                     parcelName: session.metadata.parcelName,
                     transactionId,
                     paymentStatus: session.payment_status,
                     paidAt: new Date(),
-                    trackingId: trackingId,
+                    trackingId,
                 };
-                if (session.payment_status === "paid") {
-                    const resultPayment =
-                        await paymentCollection.insertOne(payment);
-                    logTracking(trackingId, "pending-pickup");
 
-                    return res.send({
-                        success: true,
-                        modifyParcel: result,
-                        trackingId,
-                        transactionId,
-                        paymentInfo: resultPayment,
-                    });
+                // Atomic: inserts only if transactionId doesn't already exist.
+                // If it does, this just leaves the existing doc alone — no race window.
+                const upsertResult = await paymentCollection.updateOne(
+                    { transactionId },
+                    { $setOnInsert: payment },
+                    { upsert: true },
+                );
+
+                const isNewPayment = upsertResult.upsertedCount > 0;
+
+                // Only update the parcel + log tracking the first time this payment is recorded
+                if (isNewPayment) {
+                    await parcelsCollection.updateOne(
+                        { _id: new ObjectId(parcelId) },
+                        {
+                            $set: {
+                                paymentStatus: "paid",
+                                deliveryStatus: "parcel_paid",
+                            },
+                        },
+                    );
+                    logTracking(trackingId, "pending-pickup");
                 }
+
+                return res.send({
+                    success: true,
+                    message: isNewPayment
+                        ? "Payment recorded"
+                        : "Payment already recorded",
+                    transactionId,
+                    trackingId,
+                });
             } catch (err) {
                 console.error("payment-success error:", err);
                 return res.status(500).send({
@@ -428,6 +434,87 @@ async function run() {
                 });
             }
         });
+        // app.patch("/payment-success", async (req, res) => {
+        //     try {
+        //         const sessionId = req.query.session_id;
+
+        //         if (!sessionId) {
+        //             return res.status(400).send({
+        //                 success: false,
+        //                 message: "Missing session_id",
+        //             });
+        //         }
+
+        //         const session =
+        //             await stripe.checkout.sessions.retrieve(sessionId);
+
+        //         if (session.payment_status !== "paid") {
+        //             return res.send({
+        //                 success: false,
+        //                 message: "Payment not completed",
+        //             });
+        //         }
+
+        //         const transactionId = session.payment_intent;
+
+        //         const paymentExist = await paymentCollection.findOne({
+        //             transactionId,
+        //         });
+        //         if (paymentExist) {
+        //             return res.send({
+        //                 success: true,
+        //                 message: "Payment already recorded",
+        //                 transactionId,
+        //                 trackingId: paymentExist.trackingId,
+        //             });
+        //         }
+
+        //         const trackingId = session.metadata.trackingId;
+
+        //         const parcelId = session.metadata.parcelId;
+
+        //         const result = await parcelsCollection.updateOne(
+        //              { _id: new ObjectId(parcelId) },
+        //             {
+        //                 $set: {
+        //                     paymentStatus: "paid",
+        //                     deliveryStatus: "parcel_paid",
+        //                 },
+        //             },
+        //         );
+
+        //         const payment = {
+        //             amount: session.amount_total / 100,
+        //             currency: session.currency,
+        //             customerEmail: session.customer_email,
+        //             parcelId: session.metadata.parcelId,
+        //             parcelName: session.metadata.parcelName,
+        //             transactionId,
+        //             paymentStatus: session.payment_status,
+        //             paidAt: new Date(),
+        //             trackingId: trackingId,
+        //         };
+        //         if (session.payment_status === "paid") {
+        //             const resultPayment =
+        //                 await paymentCollection.insertOne(payment);
+        //             logTracking(trackingId, "pending-pickup");
+
+        //             return res.send({
+        //                 success: true,
+        //                 modifyParcel: result,
+        //                 trackingId,
+        //                 transactionId,
+        //                 paymentInfo: resultPayment,
+        //             });
+        //         }
+        //     } catch (err) {
+        //         console.error("payment-success error:", err);
+        //         return res.status(500).send({
+        //             success: false,
+        //             message: "Server error verifying payment",
+        //         });
+        //     }
+        // });
         app.get("/payments", verifyFBToken, async (req, res) => {
             try {
                 const { email } = req.query;
@@ -480,7 +567,7 @@ async function run() {
             res.send(result);
         });
 
-        app.patch("/riders/:id", verifyFBToken, async (req, res) => {
+        app.patch("/riders/:id", verifyFBToken,verifyRider, async (req, res) => {
             const status = req.body.status;
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
