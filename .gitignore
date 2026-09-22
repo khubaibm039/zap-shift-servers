@@ -3,3 +3,4 @@ node_modules
 zap-shift-firebase-adminsdk.json
 *.json.env
 .vercel
+notImportant
