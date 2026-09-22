@@ -1,24 +1,24 @@
 {
-  "name": "zap-shift-server",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon index.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "firebase-admin": "^14.3.0",
-    "mongodb": "^7.5.0",
-    "stripe": "^22.5.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
-  }
+    "name": "zap-shift-server",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "nodemon index.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "cors": "^2.8.6",
+        "dotenv": "^17.4.2",
+        "express": "^5.2.1",
+        "firebase-admin": "^14.4.0",
+        "mongodb": "^7.5.0",
+        "stripe": "^22.5.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.14"
+    }
 }
